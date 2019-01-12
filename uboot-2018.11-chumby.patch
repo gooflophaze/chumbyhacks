@@ -1,0 +1,581 @@
+diff -crB --new-file u-boot-2018.11/arch/arm/cpu/arm926ejs/mxs/mxs.c uminimum/arch/arm/cpu/arm926ejs/mxs/mxs.c
+*** u-boot-2018.11/arch/arm/cpu/arm926ejs/mxs/mxs.c	2018-11-14 11:10:06.000000000 -0500
+--- uminimum/arch/arm/cpu/arm926ejs/mxs/mxs.c	2019-01-08 02:20:50.090329743 -0500
+***************
+*** 270,278 ****
+  	if (data->mem_dram_size == 0) {
+  		printf("MXS:\n"
+  			"Error, the RAM size passed up from SPL is 0!\n");
+! 		hang();
+  	}
+! 
+  	gd->ram_size = data->mem_dram_size;
+  	return 0;
+  }
+--- 270,278 ----
+  	if (data->mem_dram_size == 0) {
+  		printf("MXS:\n"
+  			"Error, the RAM size passed up from SPL is 0!\n");
+! 	//	hang();
+  	}
+! 	data->mem_dram_size = 0x04000000;
+  	gd->ram_size = data->mem_dram_size;
+  	return 0;
+  }
+diff -crB --new-file u-boot-2018.11/arch/arm/mach-imx/mxs/Kconfig uminimum/arch/arm/mach-imx/mxs/Kconfig
+*** u-boot-2018.11/arch/arm/mach-imx/mxs/Kconfig	2018-11-14 11:10:06.000000000 -0500
+--- uminimum/arch/arm/mach-imx/mxs/Kconfig	2019-01-08 00:38:17.701429482 -0500
+***************
+*** 12,17 ****
+--- 12,21 ----
+  	bool "Support mx23_olinuxino"
+  	select BOARD_EARLY_INIT_F
+  
++ config TARGET_MX23_CHUMBY
++ 	bool "mx23_chumby krnA hack"
++ 	select BOARD_EARLY_INIT_F
++ 
+  config TARGET_MX23EVK
+  	bool "Support mx23evk"
+  	select BOARD_EARLY_INIT_F
+***************
+*** 27,32 ****
+--- 31,37 ----
+  config SYS_SOC
+  	default "mxs"
+  
++ source "board/chumby/mx23_chumby/Kconfig"
+  source "board/olimex/mx23_olinuxino/Kconfig"
+  source "board/freescale/mx23evk/Kconfig"
+  source "board/sandisk/sansa_fuze_plus/Kconfig"
+diff -crB --new-file u-boot-2018.11/board/chumby/mx23_chumby/Kconfig uminimum/board/chumby/mx23_chumby/Kconfig
+*** u-boot-2018.11/board/chumby/mx23_chumby/Kconfig	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/board/chumby/mx23_chumby/Kconfig	2019-01-08 00:00:10.321235996 -0500
+***************
+*** 0 ****
+--- 1,15 ----
++ if TARGET_MX23_CHUMBY
++ 
++ config SYS_BOARD
++ 	default "mx23_chumby"
++ 
++ config SYS_VENDOR
++ 	default "chumby"
++ 
++ config SYS_SOC
++ 	default "mxs"
++ 
++ config SYS_CONFIG_NAME
++ 	default "mx23_chumby"
++ 
++ endif
+diff -crB --new-file u-boot-2018.11/board/chumby/mx23_chumby/Makefile uminimum/board/chumby/mx23_chumby/Makefile
+*** u-boot-2018.11/board/chumby/mx23_chumby/Makefile	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/board/chumby/mx23_chumby/Makefile	2019-01-08 00:00:10.321235996 -0500
+***************
+*** 0 ****
+--- 1,10 ----
++ # SPDX-License-Identifier: GPL-2.0+
++ #
++ # (C) Copyright 2000-2006
++ # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++ 
++ ifndef	CONFIG_SPL_BUILD
++ obj-y	:= mx23_chumby.o
++ else
++ obj-y	:= spl_boot.o
++ endif
+diff -crB --new-file u-boot-2018.11/board/chumby/mx23_chumby/mx23_chumby.c uminimum/board/chumby/mx23_chumby/mx23_chumby.c
+*** u-boot-2018.11/board/chumby/mx23_chumby/mx23_chumby.c	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/board/chumby/mx23_chumby/mx23_chumby.c	2019-01-08 02:24:39.590769101 -0500
+***************
+*** 0 ****
+--- 1,203 ----
++ // SPDX-License-Identifier: GPL-2.0+
++ /*
++  * Chumby bootloader hack
++  * Olimex MX23 Olinuxino board
++  *
++  * Copyright (C) 2013 Marek Vasut <marex@denx.de>
++  */
++ //from spl_boot.c
++ //#include <config.h>
++ 
++ #define MUX_CONFIG_EMI  (MXS_PAD_3V3 | MXS_PAD_12MA | MXS_PAD_PULLUP)
++ #define MUX_CONFIG_SSP  (MXS_PAD_8MA | MXS_PAD_PULLUP)
++ //end spl_boot.c
++ 
++ #include <common.h>
++ #include <asm/gpio.h>
++ #include <asm/io.h>
++ #include <asm/arch/iomux-mx23.h>
++ #include <asm/arch/imx-regs.h>
++ #include <asm/arch/clock.h>
++ #include <asm/arch/sys_proto.h>
++ 
++ DECLARE_GLOBAL_DATA_PTR;
++ 
++ const iomux_cfg_t iomux_setup[] = {
++         /* DUART */
++         MX23_PAD_PWM0__DUART_RX,
++         MX23_PAD_PWM1__DUART_TX,
++ 
++         /* EMI */
++         MX23_PAD_EMI_D00__EMI_D00 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D01__EMI_D01 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D02__EMI_D02 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D03__EMI_D03 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D04__EMI_D04 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D05__EMI_D05 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D06__EMI_D06 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D07__EMI_D07 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D08__EMI_D08 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D09__EMI_D09 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D10__EMI_D10 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D11__EMI_D11 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D12__EMI_D12 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D13__EMI_D13 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D14__EMI_D14 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_D15__EMI_D15 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_DQM0__EMI_DQM0 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_DQM1__EMI_DQM1 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_DQS0__EMI_DQS0 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_DQS1__EMI_DQS1 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CLK__EMI_CLK | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CLKN__EMI_CLKN | MUX_CONFIG_EMI,
++ 
++         MX23_PAD_EMI_A00__EMI_A00 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A01__EMI_A01 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A02__EMI_A02 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A03__EMI_A03 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A04__EMI_A04 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A05__EMI_A05 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A06__EMI_A06 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A07__EMI_A07 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A08__EMI_A08 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A09__EMI_A09 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A10__EMI_A10 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A11__EMI_A11 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_A12__EMI_A12 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_BA0__EMI_BA0 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_BA1__EMI_BA1 | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CASN__EMI_CASN | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CE0N__EMI_CE0N | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CE1N__EMI_CE1N | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_CKE__EMI_CKE | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_RASN__EMI_RASN | MUX_CONFIG_EMI,
++         MX23_PAD_EMI_WEN__EMI_WEN | MUX_CONFIG_EMI,
++         
++ 	/* MMC 0 */
++         MX23_PAD_SSP1_CMD__SSP1_CMD | MUX_CONFIG_SSP,
++         MX23_PAD_SSP1_DATA0__SSP1_DATA0 | MUX_CONFIG_SSP,
++         MX23_PAD_SSP1_DATA1__SSP1_DATA1 | MUX_CONFIG_SSP,
++         MX23_PAD_SSP1_DATA2__SSP1_DATA2 | MUX_CONFIG_SSP,
++         MX23_PAD_SSP1_DATA3__SSP1_DATA3 | MUX_CONFIG_SSP,
++         MX23_PAD_SSP1_SCK__SSP1_SCK | MUX_CONFIG_SSP,
++ };
++ 
++ 
++ 
++ /*
++  * Functions
++  */
++ int board_early_init_f(void)
++ {
++ 	//already initted from stock bootloader
++ 	/* IO0 clock at 480MHz */
++ //	mxs_set_ioclk(MXC_IOCLK0, 480000);
++ 
++ 	/* SSP0 clock at 96MHz */
++ //	mxs_set_sspclk(MXC_SSPCLK0, 96000, 0);
++ 
++ 	return 0;
++ }
++ 
++ int dram_init(void)
++ {
++ 	return mxs_dram_init();
++ 
++ /*
++ 	arch/arm/cpu/arm926ejs/mxs/mxs.c 
++ 	manually hacked - might could just snip this bit in here
++ 	data->mem_dram_size = 0x04000000;
++         gd->ram_size = data->mem_dram_size;
++ */
++ 
++ }
++ 
++ int board_init(void)
++ {
++ 	/* Adress of boot parameters */
++ 	gd->bd->bi_boot_params = PHYS_SDRAM_1 + 0x100;
++ 	//Executed after get_ram_size
++ 	
++ 	printf("IOMuxing: ");
++ 	//enable UART and MMC pins
++ 	mxs_iomux_setup_multiple_pads(iomux_setup, ARRAY_SIZE(iomux_setup));
++ 
++         mxs_set_ioclk(MXC_IOCLK0, 480000);
++         mxs_set_sspclk(MXC_SSPCLK0, 96000, 0);
++ 
++ 	printf("Done.\n");	
++ 
++ 	//disable hardware watchdog
++ 	printf("Muzzling Watchdog: \n");
++ 	printf("Watchdog: %08lX\n", (ulong)readl(0x8005C050));
++ 	printf("RTC: %08lX\n", (ulong)readl(0x8005C000));
++ 	writel(0x00000010, 0x8005C008);		
++ 	//writel(0x8005C058, 0x00000000); doesn't work
++ 	//writel(0x8005C004, 0x00000000); //doesn't work turn off watchdog thru hw_rtc_ctrl
++ 	//writel(0x8005C008, 0x00000010); //clear watchdog bit with hw_rtc_ctrl_clr
++ 	//writel(0x8005C00C, 0x00000010); //toggle watchdog bit with hw_rtc_ctrl_clr
++ 	//writel(0x8005C054, 0x000FFFFF); //set watchdog timer 
++ 	
++ 	udelay(5000);
++ 	printf("Watchdog: %08lX\n", (ulong)readl(0x8005C050)); //read watchdog timer
++ 	printf("RTC: %08lX\n", (ulong)readl(0x8005C000));
++ 	
++ /* - chumby source shell.c
++     // Run the watchdogtimer, set to reboot the device in 20 seconds.
++     "regutil -w HW_RTC_WATCHDOG 0x00004e20\n" 20000 - 20 seconds
++     "regutil -w HW_RTC_CTRL_SET 0x00000010\n" - 1 ONEMSEC_IRQ_EN RW 0x0 1= Enable one millisecond interrupt. Use SCT writes to 
++ 
++ */
++ 
++ //	arch/arm/cpu/arm926ejs/mxs/mxs.c:	writel(RTC_CTRL_WATCHDOGEN, &rtc_regs->hw_rtc_ctrl_set);
++ //HW_RTC_CTRL 0x8005C000
++ //HW_RTC_CTRL_SET 0x8005C004
++ //HW_RTC_CTRL_CLR 0x8005C008
++ //HW_RTC_CTRL_TOG 0x8005C00C
++ 
++ //HW_RTC_WATCHDOG 0x8005C050
++ //HW_RTC_WATCHDOG_CLR 0x8005C058
++ //HW_RTC_WATCHDOG_SET 0x8005C054
++ //HW_RTC_WATCHDOG_TOG 0x8005C05C
++ 
++ //MX23_PAD_PWM0__DUART_RX
++ //mxs_common_spl_init(arg, resptr, iomux_setup, ARRAY_SIZE(iomux_setup));
++ //mxs_iomux_setup_multiple_pads
++ //int mxs_iomux_setup_pad(iomux_cfg_t pad)
++ /*
++ arch/arm/include/asm/arch-mxs/iomux-mx23.h:#define MX23_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_2)
++ arch/arm/include/asm/arch-mxs/iomux-mx23.h:#define MX23_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_2)
++ */
++ 
++ 	return 0;
++ }
++ 
++ 
++ #ifdef CONFIG_CMD_USB
++ int board_ehci_hcd_init(int port)
++ {
++         /* Enable LAN9512 (Maxi) or GL850G (Mini) USB HUB power. */
++         gpio_direction_output(MX23_PAD_GPMI_ALE__GPIO_0_17, 1);
++         udelay(100);
++         return 0;
++ }
++ 
++ int board_ehci_hcd_exit(int port)
++ {
++         /* Enable LAN9512 (Maxi) or GL850G (Mini) USB HUB power. */
++         gpio_direction_output(MX23_PAD_GPMI_ALE__GPIO_0_17, 0);
++         return 0;
++ }
++ #endif
++ 
++ #ifdef  CONFIG_CMD_MMC
++ static int mx23_olx_mmc_cd(int id)
++ {
++         return 1;       /* Card always present */
++ }
++ 
++ int board_mmc_init(bd_t *bis)
++ {
++         return mxsmmc_initialize(bis, 0, NULL, mx23_olx_mmc_cd);
++ }
++ #endif
+diff -crB --new-file u-boot-2018.11/board/chumby/mx23_chumby/spl_boot.c uminimum/board/chumby/mx23_chumby/spl_boot.c
+*** u-boot-2018.11/board/chumby/mx23_chumby/spl_boot.c	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/board/chumby/mx23_chumby/spl_boot.c	2019-01-08 00:00:10.321235996 -0500
+***************
+*** 0 ****
+--- 1,120 ----
++ // SPDX-License-Identifier: GPL-2.0+
++ /*
++  * Olimex MX23 Olinuxino Boot setup
++  *
++  * Copyright (C) 2013 Marek Vasut <marex@denx.de>
++  */
++ 
++ #include <common.h>
++ #include <config.h>
++ #include <asm/io.h>
++ #include <asm/arch/iomux-mx23.h>
++ #include <asm/arch/imx-regs.h>
++ #include <asm/arch/sys_proto.h>
++ 
++ #define	MUX_CONFIG_EMI	(MXS_PAD_3V3 | MXS_PAD_12MA | MXS_PAD_PULLUP)
++ #define	MUX_CONFIG_SSP	(MXS_PAD_8MA | MXS_PAD_PULLUP)
++ 
++ const iomux_cfg_t iomux_setup[] = {
++ 	/* DUART */
++ 	MX23_PAD_PWM0__DUART_RX,
++ 	MX23_PAD_PWM1__DUART_TX,
++ 
++ 	/* EMI */
++ 	MX23_PAD_EMI_D00__EMI_D00 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D01__EMI_D01 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D02__EMI_D02 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D03__EMI_D03 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D04__EMI_D04 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D05__EMI_D05 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D06__EMI_D06 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D07__EMI_D07 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D08__EMI_D08 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D09__EMI_D09 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D10__EMI_D10 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D11__EMI_D11 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D12__EMI_D12 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D13__EMI_D13 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D14__EMI_D14 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_D15__EMI_D15 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_DQM0__EMI_DQM0 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_DQM1__EMI_DQM1 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_DQS0__EMI_DQS0 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_DQS1__EMI_DQS1 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_CLK__EMI_CLK | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_CLKN__EMI_CLKN | MUX_CONFIG_EMI,
++ 
++ 	MX23_PAD_EMI_A00__EMI_A00 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A01__EMI_A01 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A02__EMI_A02 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A03__EMI_A03 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A04__EMI_A04 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A05__EMI_A05 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A06__EMI_A06 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A07__EMI_A07 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A08__EMI_A08 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A09__EMI_A09 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A10__EMI_A10 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A11__EMI_A11 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_A12__EMI_A12 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_BA0__EMI_BA0 | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_BA1__EMI_BA1 | MUX_CONFIG_EMI,
++ 
++ 	MX23_PAD_EMI_CASN__EMI_CASN | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_CE0N__EMI_CE0N | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_CE1N__EMI_CE1N | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_CKE__EMI_CKE | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_RASN__EMI_RASN | MUX_CONFIG_EMI,
++ 	MX23_PAD_EMI_WEN__EMI_WEN | MUX_CONFIG_EMI,
++ 
++ 	/* Green LED */
++ 	MX23_PAD_SSP1_DETECT__GPIO_2_1 |
++ 		(MXS_PAD_3V3 | MXS_PAD_4MA | MXS_PAD_NOPULL),
++ 
++ 	/* MMC 0 */
++ 	MX23_PAD_SSP1_CMD__SSP1_CMD | MUX_CONFIG_SSP,
++ 	MX23_PAD_SSP1_DATA0__SSP1_DATA0 | MUX_CONFIG_SSP,
++ 	MX23_PAD_SSP1_DATA1__SSP1_DATA1 | MUX_CONFIG_SSP,
++ 	MX23_PAD_SSP1_DATA2__SSP1_DATA2 | MUX_CONFIG_SSP,
++ 	MX23_PAD_SSP1_DATA3__SSP1_DATA3 | MUX_CONFIG_SSP,
++ 	MX23_PAD_SSP1_SCK__SSP1_SCK | MUX_CONFIG_SSP,
++ 
++ 	/* Ethernet */
++ 	MX23_PAD_GPMI_ALE__GPIO_0_17 |
++ 		(MXS_PAD_3V3 | MXS_PAD_12MA | MXS_PAD_NOPULL),
++ };
++ 
++ void board_init_ll(const uint32_t arg, const uint32_t *resptr)
++ {
++ 	mxs_common_spl_init(arg, resptr, iomux_setup, ARRAY_SIZE(iomux_setup));
++ }
++ 
++ /* Fine-tune the DRAM configuration. */
++ void mxs_adjust_memory_params(uint32_t *dram_vals)
++ {
++ 	/* Enable Auto Precharge. */
++ 	dram_vals[3] |= 1 << 8;
++ 	/* Enable Fast Writes. */
++ 	dram_vals[5] |= 1 << 8;
++ 	/* tEMRS = 3*tCK */
++ 	dram_vals[10] &= ~(0x3 << 8);
++ 	dram_vals[10] |= (0x3 << 8);
++ 	/* CASLAT = 3*tCK */
++ 	dram_vals[11] &= ~(0x3 << 0);
++ 	dram_vals[11] |= (0x3 << 0);
++ 	/* tCKE = 1*tCK */
++ 	dram_vals[12] &= ~(0x7 << 0);
++ 	dram_vals[12] |= (0x1 << 0);
++ 	/* CASLAT_LIN_GATE = 3*tCK , CASLAT_LIN = 3*tCK, tWTR=2*tCK */
++ 	dram_vals[13] &= ~((0xf << 16) | (0xf << 24) | (0xf << 0));
++ 	dram_vals[13] |= (0x6 << 16) | (0x6 << 24) | (0x2 << 0);
++ 	/* tDAL = 6*tCK */
++ 	dram_vals[15] &= ~(0xf << 16);
++ 	dram_vals[15] |= (0x6 << 16);
++ 	/* tREF = 1040*tCK */
++ 	dram_vals[26] &= ~0xffff;
++ 	dram_vals[26] |= 0x0410;
++ 	/* tRAS_MAX = 9334*tCK */
++ 	dram_vals[32] &= ~0xffff;
++ 	dram_vals[32] |= 0x2475;
++ }
+diff -crB --new-file u-boot-2018.11/configs/mx23_chumby_defconfig uminimum/configs/mx23_chumby_defconfig
+*** u-boot-2018.11/configs/mx23_chumby_defconfig	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/configs/mx23_chumby_defconfig	2019-01-08 00:01:20.633601836 -0500
+***************
+*** 0 ****
+--- 1,38 ----
++ CONFIG_ARM=y
++ CONFIG_ARCH_MX23=y
++ CONFIG_SYS_TEXT_BASE=0x40008000
++ CONFIG_SPL_GPIO_SUPPORT=y
++ CONFIG_SPL_LIBCOMMON_SUPPORT=y
++ CONFIG_SPL_LIBGENERIC_SUPPORT=y
++ CONFIG_TARGET_MX23_CHUMBY=y
++ CONFIG_SPL_SERIAL_SUPPORT=y
++ CONFIG_SPL=n
++ CONFIG_NR_DRAM_BANKS=1
++ CONFIG_BOOTDELAY=3
++ CONFIG_VERSION_VARIABLE=y
++ # CONFIG_DISPLAY_BOARDINFO is not set
++ CONFIG_ARCH_MISC_INIT=y
++ # CONFIG_SPL_FRAMEWORK is not set
++ CONFIG_HUSH_PARSER=y
++ # CONFIG_CMD_FLASH is not set
++ CONFIG_CMD_GPIO=y
++ CONFIG_CMD_MMC=y
++ CONFIG_CMD_USB=y
++ # CONFIG_CMD_SETEXPR is not set
++ CONFIG_CMD_DHCP=n
++ CONFIG_CMD_CACHE=y
++ CONFIG_CMD_EXT2=y
++ CONFIG_CMD_EXT4=y
++ CONFIG_CMD_FAT=y
++ CONFIG_ENV_IS_IN_MMC=y
++ CONFIG_LED_STATUS=n
++ CONFIG_MMC_MXS=y
++ CONFIG_CONS_INDEX=0
++ CONFIG_USB=y
++ CONFIG_USB_EHCI_HCD=y
++ CONFIG_USB_STORAGE=y
++ CONFIG_USB_HOST_ETHER=n
++ CONFIG_OF_LIBFDT=y
++ CONFIG_EXTRA_ENV_SETTINGS=y
++ CONFIG_VIDEO=y
++ CONFIG_USE_BOOTARGS=y
+diff -crB --new-file u-boot-2018.11/include/configs/mx23_chumby.h uminimum/include/configs/mx23_chumby.h
+*** u-boot-2018.11/include/configs/mx23_chumby.h	1969-12-31 19:00:00.000000000 -0500
+--- uminimum/include/configs/mx23_chumby.h	2019-01-08 00:03:29.358318504 -0500
+***************
+*** 0 ****
+--- 1,109 ----
++ /* SPDX-License-Identifier: GPL-2.0+ */
++ /*
++  * Copyright (C) 2013 Marek Vasut <marex@denx.de>
++  */
++ #ifndef __CONFIGS_MX23_CHUMBY_H__
++ #define __CONFIGS_MX23_CHUMBY_H__
++ 
++ /* System configurations */
++ //masquerade as olimex mx233
++ //#define CONFIG_MACH_TYPE	4105
++ //Sigmatel STMP378x from http://arm.linux.org.uk/devloper/machines
++ #define CONFIG_MACH_TYPE	1733
++ 
++ #define CONFIG_CMDLINE_TAG
++ //#define CONFIG_SERIAL_TAG
++ 
++ /* U-Boot Commands */
++ 
++ /* Memory configuration */
++ #define PHYS_SDRAM_1			0x40000000	/* Base address */
++ //basic chumby
++ //#define PHYS_SDRAM_1_SIZE		0x08000000	/* Max 128 MB RAM */
++ #define PHYS_SDRAM_1_SIZE		0x04000000	/* 64 MB RAM */
++ #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
++ 
++ /* Environment */
++ #define CONFIG_ENV_OVERWRITE
++ 
++ /* Environment is in MMC */
++ #if defined(CONFIG_CMD_MMC) && defined(CONFIG_ENV_IS_IN_MMC)
++ #define CONFIG_ENV_OFFSET	(256 * 1024)
++ #define CONFIG_ENV_SIZE		(16 * 1024)
++ #define CONFIG_SYS_MMC_ENV_DEV	0
++ #endif
++ 
++ /* USB */
++ #ifdef CONFIG_CMD_USB
++ #define CONFIG_EHCI_MXS_PORT0
++ #define CONFIG_USB_MAX_CONTROLLER_COUNT 1
++ #endif
++ 
++ /* Framebuffer support */
++ #ifdef CONFIG_VIDEO
++ #define CONFIG_VIDEO_LOGO
++ #define CONFIG_SPLASH_SCREEN
++ #define CONFIG_BMP_16BPP
++ #define CONFIG_VIDEO_BMP_RLE8
++ #define CONFIG_VIDEO_BMP_GZIP
++ #define CONFIG_SYS_VIDEO_LOGO_MAX_SIZE  (512 << 10)
++ #endif
++ 
++ /* Booting Linux */
++ #define CONFIG_CMD_BOOTZ 
++ #define CONFIG_BOOTFILE		"zImage"
++ #define CONFIG_LOADADDR		0x42000000
++ #define CONFIG_SYS_LOAD_ADDR	CONFIG_LOADADDR
++ 
++ /* Extra Environment */
++ #define CONFIG_EXTRA_ENV_SETTINGS \
++ 	"script=boot.scr\0"	\
++ 	"zimage=/boot/zImage\0" \
++ 	"console=ttyAMA0\0" \
++ 	"fdt_file=/boot/dtbs/imx23-chumby.dtb\0" \
++ 	"fdt_addr=0x41000000\0" \
++ 	"boot_fdt=try\0" \
++ 	"mmcdev=0\0" \
++ 	"mmcpart=3\0" \
++ 	"mmcroot=/dev/mmcblk0p3 rw rootwait\0" \
++ 	"mmcargs=setenv bootargs console=${console},${baudrate} " \
++ 		"rootfstype=ext4 ssp1=mmc ram=64M net.ifnames=0 " \
++ 		"root=${mmcroot} debug\0" \
++ 	"loadbootscript="  \
++ 		"ext4load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};\0" \
++ 	"bootscript=echo Running bootscript from mmc ...; "	\
++ 		"source\0" \
++ 	"loadzimage=ext4load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${zimage}\0" \
++ 	"loadfdt=ext4load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}\0" \
++ 	"mmcboot=echo Booting from mmc ...; " \
++ 		"run mmcargs; " \
++ 		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
++ 			"if run loadfdt; then " \
++ 				"bootz ${loadaddr} - ${fdt_addr}; " \
++ 			"else " \
++ 				"if test ${boot_fdt} = try; then " \
++ 					"bootm; " \
++ 				"else " \
++ 					"echo WARN: Cannot load the DT; " \
++ 				"fi; " \
++ 			"fi; " \
++ 		"else " \
++ 			"bootm; " \
++ 		"fi;\0" \
++ 	
++ 
++ #define CONFIG_BOOTCOMMAND \
++ 	"mmc dev ${mmcdev}; if mmc rescan; then " \
++ 		"if run loadbootscript; then " \
++ 			"run bootscript; " \
++ 		"else " \
++ 			"if run loadzimage; then " \
++ 				"run mmcboot; " \
++ 			"fi; " \
++ 		"fi; " \
++ 	"fi"
++ 
++ /* The rest of the configuration is shared */
++ #include <configs/mxs.h>
++ 
++ #endif /* __CONFIGS_MX23_CHUMBY_H__ */
